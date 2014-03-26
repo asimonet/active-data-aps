@@ -19,6 +19,11 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 public class GlobusTransferTracker extends TimerTask {
+	/**
+	 * Number of results to get from the REST API (paging)
+	 */
+	public static int LIMIT = 50;
+
 	JSONTransferAPIClient globusClient;
 
 	ActiveDataClient adClient;
@@ -26,9 +31,9 @@ public class GlobusTransferTracker extends TimerTask {
 	private Date lastCheck;
 
 	private DateFormat dateFormat;
-	
+
 	private Transition successTransition;
-	
+
 	private Transition failureTransition;
 
 	public GlobusTransferTracker(JSONTransferAPIClient globusClient, ActiveDataClient adClient) {
@@ -37,7 +42,7 @@ public class GlobusTransferTracker extends TimerTask {
 
 		lastCheck = new Date();
 		dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ");
-		
+
 		StartModel model = new StartModel();
 		successTransition = (Transition) model.getTransition("globus.success");
 		failureTransition = (Transition) model.getTransition("globus.failure");
@@ -48,73 +53,81 @@ public class GlobusTransferTracker extends TimerTask {
 		String lastCheckString = dateFormat.format(lastCheck);
 		lastCheck = new Date();
 
-		// TODO care of the page size
-		JSONTransferAPIClient.Result r = null;
+		// Paging
+		int offset = 0;
 
-		try {
-			Map<String, String> params = new HashMap<String, String>();
-			params.put("filter", "status:SUCCEEDED,FAILED/completion_time:" + lastCheckString + ",");
+		// Stats
+		int errors = 0;
+		int success = 0;
+		int failure = 0;
 
-			r = globusClient.getResult("/task_list", params);
-		} catch (Exception e) {
-			System.err.println("Exception while getting task list: " + e);
-			e.printStackTrace();
-		}
+		while(true) {
+			// Make the query
+			JSONTransferAPIClient.Result r = null;
 
-		// Check the newly terminated transfers one by one
-		if(r != null) {
 			try {
-				int length = r.document.getInt("length");
-				if (length == 0) {
-					System.out.println("No transfer done this time");
-					return;
-				}
+				Map<String, String> params = new HashMap<String, String>();
+				params.put("filter", "status:SUCCEEDED,FAILED/completion_time:" + lastCheckString + ",");
+				params.put("offset", String.valueOf(offset));
+				params.put("limit", String.valueOf(LIMIT));
 
-				JSONArray tasksArray = r.document.getJSONArray("DATA");
-				int errors = 0;
-				int success = 0;
-				int failure = 0;
-				
-				for (int i=0; i < tasksArray.length(); i++) {
-					// Get the task_id and status
-					JSONObject taskObject = tasksArray.getJSONObject(i);
-					String taskId = taskObject.getString("task_id");
-					String status = taskObject.getString("status");
-					
-					System.out.println("Task " + taskId + " is done with status " + status);
-					
-					// Get the life cycle for that task
-					LifeCycle lc = adClient.getLifeCycle("globus", taskId);
-					if(lc == null) {
-						System.err.println("Unknown life cycle for task " + taskId);
-						errors++;
-						continue;
-					}
-					
-					try {
-						if(status.equals("SUCCEEDED")) {
-							adClient.publishTransition(successTransition, lc);
-							success++;
+				r = globusClient.getResult("/task_list", params);
+			} catch (Exception e) {
+				System.err.println("Could not make REST API call: " + e);
+				break;
+			}
+
+			// Check the newly terminated transfers one by one
+			if(r != null) {
+				try {
+					int length = r.document.getInt("length");
+					if (length == 0)
+						break;
+
+					JSONArray tasksArray = r.document.getJSONArray("DATA");
+
+					for (int i=0; i < tasksArray.length(); i++) {
+						// Get the task_id and status
+						JSONObject taskObject = tasksArray.getJSONObject(i);
+						String taskId = taskObject.getString("task_id");
+						String status = taskObject.getString("status");
+
+						System.out.println("Task " + taskId + " is done with status " + status);
+
+						// Get the life cycle for that task
+						LifeCycle lc = adClient.getLifeCycle("globus", taskId);
+						if(lc == null) {
+							System.err.println("Unknown life cycle for task " + taskId);
+							errors++;
+							continue;
 						}
-						else {
-							adClient.publishTransition(failureTransition, lc);
-							failure++;
+
+						try {
+							if(status.equals("SUCCEEDED")) {
+								adClient.publishTransition(successTransition, lc);
+								success++;
+							}
+							else {
+								adClient.publishTransition(failureTransition, lc);
+								failure++;
+							}
+						} catch (TransitionNotEnabledException e) {
+							errors++;
+							continue;
+						} catch (InvalidTransitionException e) {
+							System.err.println(e);
+							System.exit(1);
 						}
-					} catch (TransitionNotEnabledException e) {
-						errors++;
-						continue;
-					} catch (InvalidTransitionException e) {
-						System.err.println(e);
-						System.exit(1);
 					}
 				}
-				
-				System.out.println(String.format("Published (success/failure/errors): %d/%d/%d",
-						success, failure, errors));
+				catch(JSONException e) {
+					System.err.println("Error while parsing JSON: " + e.getMessage());
+				}
 			}
-			catch(JSONException e) {
-				System.err.println("Error while parsing JSON: " + e.getMessage());
-			}
+			
+			offset += LIMIT;
 		}
+		System.out.println(String.format("Published (success/failure/errors): %d/%d/%d",
+				success, failure, errors));
 	}
 }

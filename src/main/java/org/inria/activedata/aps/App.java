@@ -80,8 +80,7 @@ public class App {
 			f.delete();
 		f.deleteOnExit();
 
-		MessageDigest md = MessageDigest.getInstance("MD5");
-		DigestOutputStream out = new DigestOutputStream(new FileOutputStream(f), md);
+		FileOutputStream out = new FileOutputStream(f);
 		out.write(rand);
 		out.close();
 
@@ -95,15 +94,14 @@ public class App {
 		String taskId = submitTransfer(SOURCE_ENDPOINT, srcPath, DESTINATION_ENDPOINT, destPath);
 
 		// Now compose with the transfer model using the task id
-		Token globusToken = adClient.publishTransition(model.getStartTransferTransition(), lc, t, taskId);
-		System.out.println("Started transfer " + globusToken.getUid());
+		adClient.publishTransition(model.getStartTransferTransition(), lc, t, taskId);
 	}
 
 	private String submitTransfer(String srcEndpoint, String srcPath, String destEP, String destPath) throws Exception {
 		JSONTransferAPIClient.Result r;
 
-		System.out.println("Starting transfer from " + SOURCE_ENDPOINT + " path " + srcPath
-				+ " == " + DESTINATION_ENDPOINT + " path " + destPath);
+		System.out.println("Starting transfer  " + SOURCE_ENDPOINT + " path " + srcPath
+				+ " -> " + DESTINATION_ENDPOINT + " path " + destPath);
 
 		// Ask for a submission id
 		r = globusClient.getResult("/transfer/submission_id");
@@ -187,12 +185,13 @@ public class App {
 		if(!tmp.exists())
 			tmp.mkdirs();
 
-		for(int i = 0; i < 1; i++) {
+		for(int i = 0; i < 300; i++) {
 			try {
 				app.startGlobusTransfer();
+				
+				Thread.sleep(200);
 			} catch (Exception e) {
 				System.err.println("Error with Globus transfer: " + e);
-				System.exit(15);
 			}
 		}
 	}
