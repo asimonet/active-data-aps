@@ -4,3 +4,12 @@
 *.jar
 *.war
 *.ear
+.DS_Store
+.classpath
+.project
+.settings
+bin
+dist
+.*swp
+*~
+globus_vars
