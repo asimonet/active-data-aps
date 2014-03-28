@@ -3,10 +3,8 @@ package org.inria.activedata.aps;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.security.DigestOutputStream;
 import java.security.GeneralSecurityException;
 import java.security.KeyManagementException;
-import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Random;
 import java.util.Timer;
@@ -37,8 +35,10 @@ public class App {
 	public static final String SOURCE_PATH = "/~/tmp/globus_xp/";
 
 	public static final String SOURCE_ENDPOINT = "asimonet#mbp";
+	
+	public static final String DESTINATION_PATH = "/~/aps/";
 
-	public static final String DESTINATION_ENDPOINT = "go#ep1";
+	public static final String DESTINATION_ENDPOINT = "asimonet#aps";
 
 	/**
 	 * Size in bytes of the random files for test transfers
@@ -67,6 +67,7 @@ public class App {
 			autoActivate(DESTINATION_ENDPOINT);
 		} catch (Exception e) {
 			System.err.println("Error auto-activating endpoints: " + e);
+			System.exit(17);
 		}
 	}
 
@@ -90,7 +91,7 @@ public class App {
 
 		// Make a transfer submission
 		String srcPath = SOURCE_PATH + f.getName();
-		String destPath = "/~/" + f.getName();
+		String destPath = DESTINATION_PATH + f.getName();
 		String taskId = submitTransfer(SOURCE_ENDPOINT, srcPath, DESTINATION_ENDPOINT, destPath);
 
 		// Now compose with the transfer model using the task id
@@ -130,6 +131,7 @@ public class App {
 			throws IOException, JSONException, GeneralSecurityException, APIError {
 		String resource = BaseTransferAPIClient.endpointPath(endpointName)
 				+ "/autoactivate";
+		
 		JSONTransferAPIClient.Result r = globusClient.postResult(resource, null,
 				null);
 		String code = r.document.getString("code");
@@ -158,6 +160,12 @@ public class App {
 
 		String globusAuthToken = System.getenv("GLOBUS_OAUTH_TOKEN");
 		String globusUsername = System.getenv("GLOBUS_USERNAME");
+		
+		if(globusAuthToken == null || globusUsername == null) {
+			System.out.println("Environment variables GLOBUS_OAUTH_TOKEN and GLOBUS_USERNAME " +
+					"must be defined.");
+			System.exit(15);
+		}
 
 		// Connect to the Active Data service
 		try {
@@ -167,7 +175,7 @@ public class App {
 		} catch (Exception e) {
 			System.err.println("Could not connect to Active Data service on " + args[0] + ':' +
 					args[1] + ": " + e.getMessage());
-			System.exit(14);
+			System.exit(16);
 		}
 
 		// Connect a globus client
@@ -181,11 +189,11 @@ public class App {
 		App app = new App(globusClient);
 
 		// Start some Globus transfers
-		File tmp = new File(SOURCE_PATH);
+		File tmp = new File(LOCAL_PATH);
 		if(!tmp.exists())
 			tmp.mkdirs();
 
-		for(int i = 0; i < 300; i++) {
+		for(int i = 0; i < 1; i++) {
 			try {
 				app.startGlobusTransfer();
 				
