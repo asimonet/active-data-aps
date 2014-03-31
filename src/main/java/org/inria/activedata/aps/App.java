@@ -14,7 +14,7 @@ import org.globusonline.transfer.Authenticator;
 import org.globusonline.transfer.BaseTransferAPIClient;
 import org.globusonline.transfer.GoauthAuthenticator;
 import org.globusonline.transfer.JSONTransferAPIClient;
-import org.inria.activedata.aps.models.StartModel;
+import org.inria.activedata.aps.models.APSModel;
 import org.inria.activedata.model.LifeCycle;
 import org.inria.activedata.model.Token;
 import org.inria.activedata.runtime.client.ActiveDataClient;
@@ -54,11 +54,11 @@ public class App {
 
 	private JSONTransferAPIClient globusClient;
 
-	private StartModel model;
+	private APSModel model;
 
 	public App(JSONTransferAPIClient globusClient) {
 		adClient = ActiveDataClient.getInstance();
-		model = new StartModel();
+		model = new APSModel();
 		this.globusClient = globusClient;
 		
 		// Auto-activate the endpoints

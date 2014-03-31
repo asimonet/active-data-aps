@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.TimerTask;
 
 import org.globusonline.transfer.JSONTransferAPIClient;
-import org.inria.activedata.aps.models.StartModel;
+import org.inria.activedata.aps.models.APSModel;
 import org.inria.activedata.model.InvalidTransitionException;
 import org.inria.activedata.model.LifeCycle;
 import org.inria.activedata.model.Transition;
@@ -43,7 +43,7 @@ public class GlobusTransferTracker extends TimerTask {
 		lastCheck = new Date();
 		dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ");
 
-		StartModel model = new StartModel();
+		APSModel model = new APSModel();
 		successTransition = (Transition) model.getTransition("globus.success");
 		failureTransition = (Transition) model.getTransition("globus.failure");
 	}

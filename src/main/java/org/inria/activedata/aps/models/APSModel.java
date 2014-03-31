@@ -3,30 +3,26 @@ package org.inria.activedata.aps.models;
 import org.inria.activedata.model.*;
 
 public class APSModel extends LifeCycleModel {
-	private static final long serialVersionUID = 5635409123645L;
+	private static final long serialVersionUID = 494098209840981L;
+	
+	private CompositionTransition startTransfer;
 
-	private Place created;
-	private Place pads;
-	private Place terminated;
-	
-	private Transition transfer;
-	private Transition end;
-	
 	public APSModel() {
-		super("APS");
-		
-		// The places
-		created = getStartPlace();
-		pads = addPlace("pads");
-		terminated = getEndPlace();
-		
-		// The transitions
-		transfer = addTransition("transfer");
-		addArc(created, transfer);
-		addArc(transfer, pads);
+		super("start");
 
-		end = addTransition("end");
-		addArc(pads, end);
-		addArc(end, terminated);
+		// Make a minimal life cycle
+		Place start = getStartPlace();
+		Transition end = addTransition("end");
+
+		addArc(start, end);
+		addArc(end, getEndPlace());
+
+		// Connect to Globus
+		GlobusModel globus = new GlobusModel("globus");
+		startTransfer = addCompositionTransition("start globus", start, globus);
+	}
+	
+	public CompositionTransition getStartTransferTransition() {
+		return startTransfer;
 	}
 }

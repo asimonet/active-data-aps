@@ -39,7 +39,7 @@ public class GlobusModel extends LifeCycleModel {
 		addArc(successEnd, end);
 		addArc(failureEnd, end);
 		
-		// Compose with APS
-		addCompositionTransition("end transfer", succeeded, new APSModel());
+		// Compose with the analysis
+		addCompositionTransition("end transfer", succeeded, new AnalysisModel());
 	}
 }
