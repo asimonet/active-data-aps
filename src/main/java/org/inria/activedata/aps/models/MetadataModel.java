@@ -5,6 +5,7 @@ import org.inria.activedata.model.Place;
 import org.inria.activedata.model.Transition;
 
 public class MetadataModel extends LifeCycleModel {
+	private static final long serialVersionUID = 6530558952708546375L;
 
 	public MetadataModel() {
 		super("metadata");
