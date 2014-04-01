@@ -1,6 +1,7 @@
 package org.inria.activedata.aps;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
@@ -35,7 +36,7 @@ public class App {
 	public static final String SOURCE_PATH = "/~/tmp/globus_xp/";
 
 	public static final String SOURCE_ENDPOINT = "asimonet#mbp";
-	
+
 	public static final String DESTINATION_PATH = "/~/aps/";
 
 	public static final String DESTINATION_ENDPOINT = "asimonet#aps";
@@ -60,38 +61,76 @@ public class App {
 		adClient = ActiveDataClient.getInstance();
 		model = new APSModel();
 		this.globusClient = globusClient;
-		
+
 		// Auto-activate the endpoints
 		try {
-			autoActivate(SOURCE_ENDPOINT);
-			autoActivate(DESTINATION_ENDPOINT);
+			if(!autoActivate(SOURCE_ENDPOINT)) {
+				System.err.println("Could not auto-activate " + SOURCE_ENDPOINT);
+				System.exit(18);
+			}
+
+			if(!autoActivate(DESTINATION_ENDPOINT)) {
+				System.err.println("Could not auto-activate " + DESTINATION_ENDPOINT);
+				System.exit(18);
+			}
 		} catch (Exception e) {
 			System.err.println("Error auto-activating endpoints: " + e);
 			System.exit(17);
 		}
 	}
 
-	public void startGlobusTransfer() throws Exception {
-		// Generate a random file
+	private void generateRandomFile(String path) {
 		byte[] rand = new byte[SOURCE_SIZE];
 		new Random().nextBytes(rand);
 
-		File f = new File(LOCAL_PATH + "rand_" + (++i));
+		File f = new File(path);
 		if(f.exists())
 			f.delete();
 		f.deleteOnExit();
+		
+		FileOutputStream out = null;
+		try {
+			out = new FileOutputStream(f);
+			out.write(rand);
+			out.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+			System.exit(17);
+		} finally {
+			if(out != null) {
+				try {
+					out.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+	}
+	
+	private void generatePath(String path, int nFiles) {
+		File dir = new File(path);
+		if(!dir.exists())
+			dir.mkdirs();
 
-		FileOutputStream out = new FileOutputStream(f);
-		out.write(rand);
-		out.close();
+		for(int j = 0; j < nFiles; j++)
+			generateRandomFile(dir.getAbsolutePath() + "f" + j);
+	}
+
+	public void startGlobusTransfer() throws Exception {
+		// Create a random directory
+		String dirName = "rand_" + (++i);
+		String base = LOCAL_PATH + dirName;
+		generatePath(base + "/a", 30);
+		generatePath(base + "/b", 20);
+		generatePath(base + "/c", 10);
 
 		// Publish the life cycle
-		LifeCycle lc = adClient.createAndPublishLifeCycle(model, f.getName());
+		LifeCycle lc = adClient.createAndPublishLifeCycle(model, SOURCE_ENDPOINT + SOURCE_PATH + dirName);
 		Token t = lc.getTokens(model.getStartPlace()).values().iterator().next();
 
 		// Make a transfer submission
-		String srcPath = SOURCE_PATH + f.getName();
-		String destPath = DESTINATION_PATH + f.getName();
+		String srcPath = SOURCE_PATH + dirName;
+		String destPath = DESTINATION_PATH + dirName;
 		String taskId = submitTransfer(SOURCE_ENDPOINT, srcPath, DESTINATION_ENDPOINT, destPath);
 
 		// Now compose with the transfer model using the task id
@@ -131,7 +170,7 @@ public class App {
 			throws IOException, JSONException, GeneralSecurityException, APIError {
 		String resource = BaseTransferAPIClient.endpointPath(endpointName)
 				+ "/autoactivate";
-		
+
 		JSONTransferAPIClient.Result r = globusClient.postResult(resource, null,
 				null);
 		String code = r.document.getString("code");
@@ -160,7 +199,7 @@ public class App {
 
 		String globusAuthToken = System.getenv("GLOBUS_OAUTH_TOKEN");
 		String globusUsername = System.getenv("GLOBUS_USERNAME");
-		
+
 		if(globusAuthToken == null || globusUsername == null) {
 			System.out.println("Environment variables GLOBUS_OAUTH_TOKEN and GLOBUS_USERNAME " +
 					"must be defined.");
@@ -196,7 +235,7 @@ public class App {
 		for(int i = 0; i < 1; i++) {
 			try {
 				app.startGlobusTransfer();
-				
+
 				Thread.sleep(200);
 			} catch (Exception e) {
 				System.err.println("Error with Globus transfer: " + e);
