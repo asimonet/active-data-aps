@@ -46,11 +46,11 @@ public class GlobusTransferTracker extends TimerTask {
 	private Transition successTransition;
 
 	private Transition failureTransition;
-	
+
 	private Place successPlace;
 
 	private CompositionTransition endTransferTransition;
-	
+
 	Pattern pattern;
 
 	public GlobusTransferTracker(JSONTransferAPIClient globusClient, ActiveDataClient adClient) {
@@ -65,7 +65,7 @@ public class GlobusTransferTracker extends TimerTask {
 		failureTransition = (Transition) model.getTransition("globus.failure");
 		endTransferTransition = (CompositionTransition) model.getTransition("globus.end transfer");
 		successPlace = model.getPlace("globus.success");
-		
+
 		// Prepare the regex for file path matching
 		pattern = Pattern.compile("^(\\/~\\/[^\\/]+\\/[^\\/]+)\\/.*$");
 	}
@@ -128,38 +128,57 @@ public class GlobusTransferTracker extends TimerTask {
 								failure++;
 								continue;
 							}
-							
+
 							// Publish the success transition for the whole transfer
 							adClient.publishTransition(successTransition, lc);
 
-							// Now we publish the composition transition for each dataset in the transfer
-							Map<String, String> params = new HashMap<String, String>();
-							r = globusClient.getResult("task/" + taskId + "/successful_transfers", params);
-							JSONArray filesArray = r.document.getJSONArray("DATA");
-							
-							Token t = lc.getTokens(successPlace).values().iterator().next();
-							
-							Set<String> paths = new HashSet<String>();
-							for(int j=0; i < filesArray.length(); i++) {
-								// Get the path and publish a transition only for top-level directories
-								JSONObject fileObject = filesArray.getJSONObject(j);
-								String path = fileObject.getString("destination_path");
-								path = pattern.matcher(path).group();
-								
-								if(path == null || path.equals("")) {
-									errors++;
-									continue;
-								}
-								
-								if(!paths.contains(path)) {
-									paths.add(path);
-									
-									adClient.publishTransition(endTransferTransition, lc, t, path);
-									System.out.println("Published composition transition for " + path);
-								}
-							}
+							/*
+							 * Now we publish the composition transition for each dataset in the transfer
+							 */
 
-							success++;
+							// Paging
+							int fileOffset = 0;
+
+							Token t = lc.getTokens(successPlace).values().iterator().next();
+							Set<String> paths = new HashSet<String>();
+
+							while(true) {
+								// Construct a request
+								Map<String, String> params = new HashMap<String, String>();
+								params.put("offset", String.valueOf(fileOffset));
+								params.put("limit", String.valueOf(LIMIT));
+
+								JSONTransferAPIClient.Result filesResult = globusClient.getResult("task/" + taskId + "/successful_transfers", params);
+
+								int fileLength = filesResult.document.getInt("length");
+								if(fileLength == 0)
+									break;
+
+								// Iterate over the results
+								JSONArray filesArray = filesResult.document.getJSONArray("DATA");
+								for(int j = 0; j < filesArray.length(); j++) {
+									// Get the path and publish a transition only for top-level directories
+									JSONObject fileObject = filesArray.getJSONObject(j);
+									String path = fileObject.getString("destination_path");
+									path = pattern.matcher(path).group();
+
+									if(path == null || path.equals("")) {
+										errors++;
+										continue;
+									}
+
+									if(!paths.contains(path)) {
+										paths.add(path);
+
+										adClient.publishTransition(endTransferTransition, lc, t, path);
+										System.out.println("Published composition transition for " + path);
+									}
+								}
+
+								success++;
+								
+								fileOffset += LIMIT;
+							}
 						} catch (TransitionNotEnabledException e) {
 							errors++;
 							continue;
