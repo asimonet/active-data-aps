@@ -3,12 +3,11 @@
 import os
 import sys
 import signal
-from threading import Thread, Event
-import json
-import pprint
 import time
 from datetime import datetime
-pp = pprint.PrettyPrinter(indent=4).pprint
+import pprint
+
+pp = pprint.PrettyPrinter(4).pprint
 
 from subprocess import call
 
@@ -21,9 +20,6 @@ from globusonline.catalog.client.operators import Op
 dataset_url = "https://catalog-alpha.globuscs.info/service/dataset"
 catalog_id = 1
 
-ep_name = "asimonet#aps"
-ep_path = "/~/"
-
 limit = 50
 
 ad_jar = "/Users/asimonet/projets/branches/ActiveData/dist/active-data-lib-0.2.0.jar"
@@ -35,14 +31,15 @@ def start_tracking(catalog_client):
 	last_check = datetime.utcnow()
 
 	while not shutdown:
-		time.sleep(15)
-
 		success = 0
 		failure = 0
 		selector = [("modified", Op.GT, last_check.isoformat(' '))]
-		_, data = catalog_client.get_dataset_annotations(catalog_id, selector_list=selector, annotation_list = ['id', 'modified'])
+		selector = [("modified", Op.GT, '2014-03-31 10:00:00+00')]
+		#_, data = catalog_client.get_dataset_annotations(catalog_id, selector_list=selector, annotation_list = ['id', 'modified'])
+		_, data = catalog_client.get_dataset_annotations(catalog_id, selector_list=selector)
 		
-		print data
+		if len(data) > 0:
+			pp(data)
 		
 		for id in data:
 			ret = call(["java", \
@@ -61,21 +58,23 @@ def start_tracking(catalog_client):
 			
 		print "Published update transitions (success/failures): %d/%d" % (success, failure)
 		last_check = datetime.utcnow()
+
+		time.sleep(15)
 	
 	sys.exit(0)
 		
 
 def sighandler(signum, frame):
-	print "sighandler!"
+	print "Exiting"
 	global shutdown
 	shutdown = True
 		
 # Main code
-if len(sys.argv) != 1:
+if len(sys.argv) != 2:
 	print "Usage: metadata_tracker.py <goauth token>"
 else:
 	signal.signal(signal.SIGTERM, sighandler)
 	signal.signal(signal.SIGINT, sighandler)
 
-	catalog_client = dataset_client.DatasetClient(sys.argv[2], base_url=dataset_url)
+	catalog_client = dataset_client.DatasetClient(sys.argv[1], base_url=dataset_url)
 	start_tracking(catalog_client)
