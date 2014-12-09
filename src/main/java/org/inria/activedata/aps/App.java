@@ -123,7 +123,8 @@ public class App {
 		generatePath(base + "/a", 30);
 		generatePath(base + "/b", 20);
 		generatePath(base + "/c", 10);
-
+		String datasetId = "";
+		
 		// Publish the life cycle
 		LifeCycle lc = adClient.createAndPublishLifeCycle(model, SOURCE_ENDPOINT + SOURCE_PATH + dirName);
 		Token t = lc.getTokens(model.getStartPlace()).values().iterator().next();

@@ -22,6 +22,8 @@ log_directory = os.path.normpath(sys.argv[2])
 log_filename = os.path.join(log_directory, os.path.basename(log_directory) + ".log")
 log_file = open(log_filename, "r")
 
+# Match the path in the endpoint to the 
+
 # Class definition for a single Task
 class Task:
 	app			= ''

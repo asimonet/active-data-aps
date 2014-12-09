@@ -38,8 +38,15 @@ public class GlobusModel extends LifeCycleModel {
 		addArc(failed, failureEnd);
 		addArc(successEnd, end);
 		addArc(failureEnd, end);
-		
-		// Compose with the analysis
-		addCompositionTransition("end transfer", succeeded, new AnalysisModel());
+	}
+	
+	/**
+	 * Allow different instances to be composed with different models when
+	 * a transfer succeeds.
+	 * 
+	 * @param destination the model to compose
+	 */
+	public void composeSuccessWith(LifeCycleModel destination) {
+		addCompositionTransition("end transfer", succeeded, destination);
 	}
 }

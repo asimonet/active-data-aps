@@ -1,8 +1,5 @@
 package org.inria.activedata.aps;
 
-import java.io.IOException;
-import java.net.MalformedURLException;
-import java.security.GeneralSecurityException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -11,10 +8,8 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimerTask;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.globusonline.transfer.APIError;
 import org.globusonline.transfer.JSONTransferAPIClient;
 import org.inria.activedata.aps.models.APSModel;
 import org.inria.activedata.model.CompositionTransition;
@@ -43,13 +38,19 @@ public class GlobusTransferTracker extends TimerTask {
 
 	private DateFormat dateFormat;
 
-	private Transition successTransition;
+	private Transition firstSuccessTransition;
 
-	private Transition failureTransition;
+	private Transition firstFailureTransition;
 
-	private Place successPlace;
+	private Place firstSuccessPlace;
 
-	private CompositionTransition endTransferTransition;
+	private CompositionTransition firstEndTransferTransition;
+
+	private Transition secondSuccessTransition;
+
+	private Transition secondFailureTransition;
+
+	private Place secondSuccessPlace;
 
 	Pattern pattern;
 
@@ -61,10 +62,16 @@ public class GlobusTransferTracker extends TimerTask {
 		dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ");
 
 		APSModel model = new APSModel();
-		successTransition = (Transition) model.getTransition("globus.success");
-		failureTransition = (Transition) model.getTransition("globus.failure");
-		endTransferTransition = (CompositionTransition) model.getTransition("globus.end transfer");
-		successPlace = model.getPlace("globus.success");
+
+		// Consider the two Globus transfers as different systems
+		firstSuccessTransition = (Transition) model.getTransition("globus.success");
+		firstFailureTransition = (Transition) model.getTransition("globus.failure");
+		firstEndTransferTransition = (CompositionTransition) model.getTransition("globus.end transfer");
+		firstSuccessPlace = model.getPlace("globus.success");
+
+		secondSuccessTransition = (Transition) model.getTransition("globus-2.success");
+		secondFailureTransition = (Transition) model.getTransition("globus-2.failure");
+		secondSuccessPlace = model.getPlace("globus-2.success");
 
 		// Prepare the regex for file path matching
 		pattern = Pattern.compile("^(\\/~\\/[^\\/]+\\/[^\\/]+)\\/.*$");
@@ -114,32 +121,41 @@ public class GlobusTransferTracker extends TimerTask {
 						String taskId = taskObject.getString("task_id");
 						String status = taskObject.getString("status");
 
-						// Get the life cycle for that task
+						// Figure out if the transfer is the first one, or the second one
 						LifeCycle lc = adClient.getLifeCycle("globus", taskId);
+						boolean first = true;
 						if(lc == null) {
-							System.err.println("Unknown life cycle for task " + taskId);
-							errors++;
-							continue;
+							lc = adClient.getLifeCycle("globus-2", taskId);
+							first = false;
+
+							if(lc == null) {
+								System.err.println("Unknown life cycle for task " + taskId);
+								errors++;
+								continue;
+							}
 						}
 
 						try {
 							if(status.equals("FAILED")) {
-								adClient.publishTransition(failureTransition, lc);
+								adClient.publishTransition(first? firstFailureTransition:secondFailureTransition, lc);
 								failure++;
 								continue;
 							}
 
 							// Publish the success transition for the whole transfer
-							adClient.publishTransition(successTransition, lc);
+							adClient.publishTransition(first? firstSuccessTransition:secondSuccessTransition, lc);
 
 							/*
-							 * Now we publish the composition transition for each dataset in the transfer
+							 * Now we publish the composition transition for each dataset in the transfer, but
+							 * only for the first Globus transfer
 							 */
+							if(!first)
+								continue;
 
 							// Paging
 							int fileOffset = 0;
 
-							Token t = lc.getTokens(successPlace).values().iterator().next();
+							Token t = lc.getTokens(firstSuccessPlace).values().iterator().next();
 							Set<String> paths = new HashSet<String>();
 
 							while(true) {
@@ -170,13 +186,13 @@ public class GlobusTransferTracker extends TimerTask {
 									if(!paths.contains(path)) {
 										paths.add(path);
 
-										adClient.publishTransition(endTransferTransition, lc, t, path);
+										adClient.publishTransition(firstEndTransferTransition, lc, t, path);
 										System.out.println("Published composition transition for " + path);
 									}
 								}
 
 								success++;
-								
+
 								fileOffset += LIMIT;
 							}
 						} catch (TransitionNotEnabledException e) {

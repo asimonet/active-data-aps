@@ -8,7 +8,7 @@ public class APSModel extends LifeCycleModel {
 	private CompositionTransition startTransfer;
 
 	public APSModel() {
-		super("start");
+		super("filesystem A");
 
 		// Make a minimal life cycle
 		Place start = getStartPlace();
@@ -19,6 +19,7 @@ public class APSModel extends LifeCycleModel {
 
 		// Connect to Globus
 		GlobusModel globus = new GlobusModel("globus");
+		globus.composeSuccessWith(new AnalysisModel());
 		startTransfer = addCompositionTransition("start globus", start, globus);
 	}
 	
